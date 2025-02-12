@@ -1,0 +1,32 @@
+---
+- name: Log Collection and Analysis
+  hosts: logcollector
+  become: yes
+  tasks:
+    - name: Install rsyslog
+      ansible.builtin.package:
+        name: rsyslog
+        state: present
+    - name: Configure rsyslog for centralized logging
+      ansible.builtin.lineinfile:
+        path: /etc/rsyslog.conf
+        regexp: "^#*\\s*\\$ModLoad imtcp"
+        line: "$ModLoad imtcp"
+        state: present
+        backup: yes
+    - name: Ensure rsyslog listens on TCP port 514      
+      ansible.builtin.lineinfile:
+        path: /etc/rsyslog.conf
+        regexp: "^#*\\s*\\$InputTCPServerRun 514"
+        line: "$InputTCPServerRun 514"
+        state: present
+        backup: yes
+    - name: Restart rsyslog service
+      ansible.builtin.service:
+        name: rsyslog
+        state: restarted
+    - name: Ensure rsyslog service is enabled
+      ansible.builtin.service:
+        name: rsyslog
+        enabled: yes
+        state: started
