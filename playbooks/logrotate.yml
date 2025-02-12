@@ -1,0 +1,54 @@
+---
+- name: Configure rsyslog for custom log storage and rotation
+  hosts: all
+  become: yes
+  tasks:
+
+    - name: Ensure required directories exist
+      file:
+        path: "/var/log/endpoints/2025/feb/"
+        state: directory
+        mode: '0755'
+
+    - name: Configure rsyslog to log messages into vendor-DDMMYYYY.log
+      blockinfile:
+        path: "/etc/rsyslog.d/50-endpoints.conf"
+        create: yes
+        mode: '0644'
+        block: |
+          $template DailyLog,"/var/log/endpoints/2025/feb/vendor-%d%m%Y.log"
+          *.* ?DailyLog
+          & ~
+
+    - name: Restart rsyslog service
+      systemd:
+        name: rsyslog
+        state: restarted
+        enabled: yes
+
+    - name: Configure logrotate for custom logs
+      copy:
+        dest: "/etc/logrotate.d/endpoints"
+        mode: '0644'
+        content: |
+          /var/log/endpoints/2025/feb/vendor-*.log {
+              daily
+              rotate 30
+              missingok
+              notifempty
+              dateext
+              compress
+              delaycompress
+              copytruncate
+              create 0644 root root
+              postrotate
+                  systemctl restart rsyslog > /dev/null 2>&1 || true
+              endscript
+          }
+
+    - name: Ensure logrotate runs at 1 AM
+      cron:
+        name: "Run logrotate at 1 AM"
+        minute: "0"
+        hour: "1"
+        job: "/usr/sbin/logrotate /etc/logrotate.conf"
